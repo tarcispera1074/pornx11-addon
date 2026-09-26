@@ -683,6 +683,17 @@ http
     const p = u.pathname;
     console.log(`[${req.method}] ${p}${u.search}`);
 
+    if (p === "/debug") {
+      try {
+        const dr = await fetchWithTimeout("https://pornx11.com/wp-json/wp/v2/posts?per_page=1", {
+          headers: { "User-Agent": UA, Accept: "application/json", Referer: `${BASE_URL}/` }
+        });
+        const txt = await dr.text();
+        return sendJson(res, 200, { status: dr.status, ok: dr.ok, bodyPreview: txt.slice(0, 500) });
+      } catch (err) {
+        return sendJson(res, 500, { error: err.message });
+      }
+    }
     if (p === "/manifest.json") return sendJson(res, 200, manifest);
 
     if (p === "/") {
