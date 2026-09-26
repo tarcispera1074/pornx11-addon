@@ -398,7 +398,9 @@ async function fetchPageHtml(pageUrl) {
 
   if (!html || html.includes("<title>Just a moment...</title>")) {
     console.log(`[PAGE] Direct fetch blocked, using Cloudflare bypass proxy...`);
-    const pr = await fetchWithTimeout(`https://r.jina.ai/${pageUrl}`);
+    const pr = await fetchWithTimeout(`https://r.jina.ai/${pageUrl}`, {
+      headers: { "X-Return-Format": "html" }
+    });
     if (pr.ok) {
       html = await pr.text();
     } else {
@@ -455,15 +457,25 @@ function extractEmbedCandidates($, html) {
 
 async function resolveHoster(embedUrl) {
   try {
-    const r = await fetchWithTimeout(embedUrl, {
-      headers: {
-        "user-agent": UA,
-        referer: BASE_URL + "/",
-        accept: "text/html,*/*"
-      }
-    });
-    if (!r.ok) return null;
-    const html = await r.text();
+    let html = "";
+    try {
+      const r = await fetchWithTimeout(embedUrl, {
+        headers: {
+          "user-agent": UA,
+          referer: BASE_URL + "/",
+          accept: "text/html,*/*"
+        }
+      });
+      if (r.ok) html = await r.text();
+    } catch (err) {}
+
+    if (!html || html.includes("<title>Just a moment...</title>")) {
+      const pr = await fetchWithTimeout(`https://r.jina.ai/${embedUrl}`, {
+        headers: { "X-Return-Format": "html" }
+      });
+      if (pr.ok) html = await pr.text();
+    }
+    if (!html) return null;
     const $ = load(html);
 
     let fullText = html;
