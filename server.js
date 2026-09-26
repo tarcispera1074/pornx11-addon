@@ -322,16 +322,29 @@ async function fetchCatalog({ skip = 0, search = "", type = "movie", genre = "",
     url.searchParams.set("search", search);
   }
 
-  const r = await fetchWithTimeout(url.href, {
-    headers: { "user-agent": UA, accept: "application/json" }
-  });
+  let posts = null;
+  try {
+    const r = await fetchWithTimeout(url.href, {
+      headers: { "user-agent": UA, accept: "application/json" }
+    });
+    if (r.ok) {
+      posts = await r.json();
+    }
+  } catch (e) {}
 
-  if (!r.ok) {
-    console.log(`[CATALOG] WP API returned ${r.status}`);
-    return [];
+  if (!Array.isArray(posts) || posts.length === 0) {
+    console.log(`[CATALOG] Direct fetch blocked or empty, using Cloudflare bypass proxy...`);
+    try {
+      const pr = await fetchWithTimeout(`https://r.jina.ai/${url.href}`);
+      if (pr.ok) {
+        const text = await pr.text();
+        const m = text.match(/\[\s*\{[\s\S]*\}\s*\]/);
+        if (m) posts = JSON.parse(m[0]);
+      }
+    } catch (e) {
+      console.log(`[CATALOG] Proxy fallback error: ${e.message}`);
+    }
   }
-
-  const posts = await r.json();
   if (!Array.isArray(posts)) return [];
 
   const metas = posts.map((p) => {
@@ -371,15 +384,27 @@ async function fetchPageHtml(pageUrl) {
   const cached = cacheGet(pageCache, pageUrl);
   if (cached) return cached.html;
 
-  const r = await fetchWithTimeout(pageUrl, {
-    headers: {
-      "user-agent": UA,
-      accept: "text/html,application/xhtml+xml",
-      "accept-language": "en-US,en;q=0.9"
+  let html = "";
+  try {
+    const r = await fetchWithTimeout(pageUrl, {
+      headers: {
+        "user-agent": UA,
+        accept: "text/html,application/xhtml+xml",
+        "accept-language": "en-US,en;q=0.9"
+      }
+    });
+    if (r.ok) html = await r.text();
+  } catch (e) {}
+
+  if (!html || html.includes("<title>Just a moment...</title>")) {
+    console.log(`[PAGE] Direct fetch blocked, using Cloudflare bypass proxy...`);
+    const pr = await fetchWithTimeout(`https://r.jina.ai/${pageUrl}`);
+    if (pr.ok) {
+      html = await pr.text();
+    } else {
+      throw new Error("Page fetch failed");
     }
-  });
-  if (!r.ok) throw new Error(`Page fetch ${r.status}`);
-  const html = await r.text();
+  }
   cacheSet(pageCache, pageUrl, { html });
   return html;
 }
