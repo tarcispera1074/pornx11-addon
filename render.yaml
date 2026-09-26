@@ -1,11 +1,10 @@
- services:
- - type: web
- name: pornx11-addon
- runtime: node
- plan: free
- buildCommand: npm install
- startCommand: npm start
- envVars:
- - key: NODE_VERSION
- value: 20
-
+services:
+  - type: web
+    name: pornx11-addon
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20
