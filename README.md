@@ -1,5 +1,7 @@
 # PornX11 Stremio/Nuvio Addon
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Yousha1011/pornx11-addon)
+
 A self-hosted addon that pulls the catalog from `pornx11.com` via its
 WordPress REST API and resolves each video to a directly playable stream
 by scraping the article page and any embedded hosters (lulustream etc.).
