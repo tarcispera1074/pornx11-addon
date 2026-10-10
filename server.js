@@ -159,7 +159,7 @@ const GENRE_OPTIONS = [...new Set(CATEGORIES.map((c) => c.name))].sort((a, b) =>
 // ---------------------------------------------------------------------------
 const manifest = {
   id: "com.pornx11.addon",
-  version: "1.3.1",
+  version: "1.3.2",
   name: "OTT Networks & Studios v2",
   description: "Browse and stream by OTT network & studio",
   logo: POSTER_FALLBACK,
