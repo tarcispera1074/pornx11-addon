@@ -159,7 +159,7 @@ const GENRE_OPTIONS = [...new Set(CATEGORIES.map((c) => c.name))].sort((a, b) =>
 // ---------------------------------------------------------------------------
 const manifest = {
   id: "com.pornx11.addon",
-  version: "1.3.3",
+  version: "1.3.4",
   name: "OTT Networks & Studios v2",
   description: "Browse and stream by OTT network & studio",
   logo: POSTER_FALLBACK,
@@ -836,7 +836,11 @@ http
 
         const ref = referer || pageUrl;
         const proxyBase = getProxyBase(req);
-        const proxyUrl = `${proxyBase}/proxy/master.m3u8?url=${encodeURIComponent(videoUrl)}&referer=${encodeURIComponent(ref)}`;
+        let proxyUrl = `${proxyBase}/proxy/master.m3u8?url=${encodeURIComponent(videoUrl)}&referer=${encodeURIComponent(ref)}`;
+        if (process.env.CF_WORKER_URL) {
+          const workerBase = process.env.CF_WORKER_URL.replace(/\/+$/, "");
+          proxyUrl = `${workerBase}/stream.m3u8?embed=${encodeURIComponent(ref)}&url=${encodeURIComponent(videoUrl)}`;
+        }
 
         return sendJson(
           res,
