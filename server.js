@@ -203,15 +203,16 @@ function cacheSet(map, key, val, ttl = CACHE_TTL_MS) {
 // ---------------------------------------------------------------------------
 // HELPERS
 // ---------------------------------------------------------------------------
-function sendJson(res, status, data) {
+function sendJson(res, status, data, extraHeaders = {}) {
   const body = JSON.stringify(data);
   res.writeHead(status, {
     "content-type": "application/json; charset=utf-8",
     "access-control-allow-origin": "*",
     "access-control-allow-headers": "*",
     "access-control-allow-methods": "GET, HEAD, OPTIONS",
-    "cache-control": "max-age=600, stale-while-revalidate=1200",
-    "content-length": Buffer.byteLength(body)
+    "cache-control": extraHeaders["cache-control"] || "max-age=600, stale-while-revalidate=1200",
+    "content-length": Buffer.byteLength(body),
+    ...extraHeaders
   });
   res.end(body);
 }
@@ -538,7 +539,7 @@ async function resolveVideoFromPage(pageUrl) {
   const direct = candidates.find((c) => c.type === "direct");
   if (direct) {
     const res = { videoUrl: direct.url, referer: pageUrl };
-    cacheSet(streamCache, pageUrl, res, 30 * 60 * 1000);
+    cacheSet(streamCache, pageUrl, res, 60 * 1000);
     return res;
   }
 
@@ -546,7 +547,7 @@ async function resolveVideoFromPage(pageUrl) {
     const resolved = await resolveHoster(c.url);
     if (resolved && resolved.videoUrl) {
       console.log(`[SCRAPE] Resolved via hoster -> ${resolved.videoUrl.slice(0, 80)}`);
-      cacheSet(streamCache, pageUrl, resolved, 30 * 60 * 1000);
+      cacheSet(streamCache, pageUrl, resolved, 60 * 1000);
       return resolved;
     }
   }
@@ -831,32 +832,23 @@ http
         const proxyBase = getProxyBase(req);
         const proxyUrl = `${proxyBase}/proxy?url=${encodeURIComponent(videoUrl)}&referer=${encodeURIComponent(ref)}`;
 
-        return sendJson(res, 200, {
-          streams: [
-            {
-              name: "Direct CDN",
-              title: `⚡ ${title} (Zero Bandwidth)`,
-              url: videoUrl,
-              behaviorHints: {
-                notWebReady: true,
-                proxyHeaders: {
-                  request: {
-                    "User-Agent": UA,
-                    "Referer": ref
-                  }
+        return sendJson(
+          res,
+          200,
+          {
+            streams: [
+              {
+                name: "Stream",
+                title,
+                url: proxyUrl,
+                behaviorHints: {
+                  notWebReady: false
                 }
               }
-            },
-            {
-              name: "Proxy Backup",
-              title: `🛡️ ${title} (Proxy Backup)`,
-              url: proxyUrl,
-              behaviorHints: {
-                notWebReady: false
-              }
-            }
-          ]
-        });
+            ]
+          },
+          { "cache-control": "no-cache, no-store, must-revalidate" }
+        );
       } catch (e) {
         console.error("[STREAM ERR]", e.message);
         return sendJson(res, 200, { streams: [] });
