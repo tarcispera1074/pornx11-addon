@@ -159,7 +159,7 @@ const GENRE_OPTIONS = [...new Set(CATEGORIES.map((c) => c.name))].sort((a, b) =>
 // ---------------------------------------------------------------------------
 const manifest = {
   id: "com.pornx11.addon",
-  version: "1.3.2",
+  version: "1.3.3",
   name: "OTT Networks & Studios v2",
   description: "Browse and stream by OTT network & studio",
   logo: POSTER_FALLBACK,
@@ -596,7 +596,10 @@ function rewriteM3u8(text, baseUrl, referer, proxyBase) {
   const rewriteUri = (raw) => {
     let abs;
     try { abs = new URL(raw, baseUrl).href; } catch { return raw; }
-    return `${proxyBase}/proxy?url=${encodeURIComponent(abs)}&referer=${encodeURIComponent(referer)}`;
+    let ext = ".ts";
+    if (abs.includes(".m3u8")) ext = ".m3u8";
+    else if (abs.includes(".key")) ext = ".key";
+    return `${proxyBase}/proxy/hls${ext}?url=${encodeURIComponent(abs)}&referer=${encodeURIComponent(referer)}`;
   };
 
   for (const line of lines) {
@@ -742,7 +745,7 @@ http
       });
     }
 
-    if (p === "/proxy") return handleProxy(req, res, u);
+    if (p === "/proxy" || p.startsWith("/proxy/")) return handleProxy(req, res, u);
 
     // -----------------------------------------------------------------------
     // CATALOG
@@ -830,7 +833,7 @@ http
 
         const ref = referer || pageUrl;
         const proxyBase = getProxyBase(req);
-        const proxyUrl = `${proxyBase}/proxy?url=${encodeURIComponent(videoUrl)}&referer=${encodeURIComponent(ref)}`;
+        const proxyUrl = `${proxyBase}/proxy/master.m3u8?url=${encodeURIComponent(videoUrl)}&referer=${encodeURIComponent(ref)}`;
 
         return sendJson(
           res,
