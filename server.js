@@ -230,6 +230,9 @@ function norm(t) {
 }
 
 function getProxyBase(req) {
+  if (process.env.CF_WORKER_URL) {
+    return process.env.CF_WORKER_URL.replace(/\/+$/, "");
+  }
   const proto =
     req.headers["x-forwarded-proto"]?.split(",")[0]?.trim() || "http";
   const host =
