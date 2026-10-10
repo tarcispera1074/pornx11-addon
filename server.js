@@ -159,7 +159,7 @@ const GENRE_OPTIONS = [...new Set(CATEGORIES.map((c) => c.name))].sort((a, b) =>
 // ---------------------------------------------------------------------------
 const manifest = {
   id: "com.pornx11.addon",
-  version: "1.3.0",
+  version: "1.3.1",
   name: "OTT Networks & Studios v2",
   description: "Browse and stream by OTT network & studio",
   logo: POSTER_FALLBACK,
@@ -399,8 +399,8 @@ async function fetchPageHtml(pageUrl) {
 
   if (!html || html.includes("<title>Just a moment...</title>")) {
     console.log(`[PAGE] Direct fetch blocked, using Cloudflare bypass proxy...`);
-    const pr = await fetchWithTimeout(`https://r.jina.ai/${pageUrl}`, {
-      headers: { "X-Return-Format": "html" }
+    const pr = await fetchWithTimeout(`https://r.jina.ai/${pageUrl}?_t=${Date.now()}`, {
+      headers: { "X-Return-Format": "html", "X-No-Cache": "true" }
     });
     if (pr.ok) {
       html = await pr.text();
@@ -471,8 +471,8 @@ async function resolveHoster(embedUrl) {
     } catch (err) {}
 
     if (!html || html.includes("<title>Just a moment...</title>")) {
-      const pr = await fetchWithTimeout(`https://r.jina.ai/${embedUrl}`, {
-        headers: { "X-Return-Format": "html" }
+      const pr = await fetchWithTimeout(`https://r.jina.ai/${embedUrl}?_t=${Date.now()}`, {
+        headers: { "X-Return-Format": "html", "X-No-Cache": "true" }
       });
       if (pr.ok) html = await pr.text();
     }
