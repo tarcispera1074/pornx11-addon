@@ -827,14 +827,29 @@ http
           title = "Direct MP4";
         }
 
+        const ref = referer || pageUrl;
         const proxyBase = getProxyBase(req);
-        const proxyUrl = `${proxyBase}/proxy?url=${encodeURIComponent(videoUrl)}&referer=${encodeURIComponent(referer || pageUrl)}`;
+        const proxyUrl = `${proxyBase}/proxy?url=${encodeURIComponent(videoUrl)}&referer=${encodeURIComponent(ref)}`;
 
         return sendJson(res, 200, {
           streams: [
             {
-              name: "Stream",
-              title,
+              name: "Direct CDN",
+              title: `⚡ ${title} (Zero Bandwidth)`,
+              url: videoUrl,
+              behaviorHints: {
+                notWebReady: true,
+                proxyHeaders: {
+                  request: {
+                    "User-Agent": UA,
+                    "Referer": ref
+                  }
+                }
+              }
+            },
+            {
+              name: "Proxy Backup",
+              title: `🛡️ ${title} (Proxy Backup)`,
               url: proxyUrl,
               behaviorHints: {
                 notWebReady: false
