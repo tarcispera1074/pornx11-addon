@@ -34,7 +34,7 @@ const CATEGORIES = [
   { id: 90, name: "Uncut Hot Web Series", slug: "uncut-hot-web-series" },
   { id: 15135, name: "Wowmasti.Com", slug: "wowmasti-com" },
 
-  // 2. Major OTT Networks & Studios
+  // 2. Major OTT Networks & Studios v2
   { id: 85, name: "11Upmovies", slug: "11upmovies" },
   { id: 84, name: "ALTBalaji", slug: "altbalaji" },
   { id: 14709, name: "Atrangii", slug: "atrangii" },
@@ -72,7 +72,7 @@ const CATEGORIES = [
   { id: 45, name: "XPrime", slug: "xprime" },
   { id: 41, name: "Xtramood", slug: "xtramood" },
 
-  // 3. Medium OTT Networks & Studios
+  // 3. Medium OTT Networks & Studios v2
   { id: 11, name: "AppleFlix", slug: "appleflix-originals" },
   { id: 83, name: "Banana Prime", slug: "banana-prime" },
   { id: 13965, name: "Besharams", slug: "besharams" },
@@ -160,7 +160,7 @@ const GENRE_OPTIONS = [...new Set(CATEGORIES.map((c) => c.name))].sort((a, b) =>
 const manifest = {
   id: "com.pornx11.addon",
   version: "1.3.0",
-  name: "OTT Networks & Studios",
+  name: "OTT Networks & Studios v2",
   description: "Browse and stream by OTT network & studio",
   logo: POSTER_FALLBACK,
   resources: ["catalog", "meta", "stream"],
