@@ -1,3 +1,8 @@
 name = "stream-proxy"
 main = "cloudflare-worker.js"
 compatibility_date = "2024-09-23"
+
+# Optional vars (wrangler deploy picks these up):
+# [vars]
+# ALLOWED_EXTRA_HOSTS = "cdn.example.com,other.example"
+# PROXY_ALLOW_ANY = "1"   # disables the host allowlist — trusted use only

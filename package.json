@@ -1,16 +1,19 @@
 {
   "name": "pornx11-addon",
-  "version": "1.0.0",
+  "version": "1.4.0",
   "description": "Stremio/Nuvio addon for pornx11.com",
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "check": "node --check server.js && node --check cloudflare-worker.js && node --check test_stream.js",
+    "verify": "node verify.js",
+    "diagnose": "node test_stream.js"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.18.1"
   },
   "dependencies": {
-    "cheerio": "^1.0.0-rc.12"
+    "cheerio": "^1.2.0"
   }
 }

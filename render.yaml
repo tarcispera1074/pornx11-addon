@@ -5,6 +5,14 @@ services:
     plan: free
     buildCommand: npm install
     startCommand: npm start
+    healthCheckPath: /healthz
     envVars:
       - key: NODE_VERSION
         value: 20
+      # Optional:
+      # - key: CF_WORKER_URL      # send playback through the Cloudflare Worker instead
+      #   value: https://stream-proxy.example.workers.dev
+      # - key: ALLOWED_EXTRA_HOSTS
+      #   value: cdn.example.com,other.example
+      # - key: DEBUG_TOKEN
+      #   value: change-me
