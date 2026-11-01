@@ -4,6 +4,14 @@
 // Deploy:  npx wrangler deploy
 // Vars:    ALLOWED_EXTRA_HOSTS="cdn.example.com,other.example"
 //          PROXY_ALLOW_ANY="1"   (disables the host allowlist — trusted use only)
+//
+// Caching:
+//   * media pieces (segments, keys) go into Cloudflare's edge cache under a key
+//     with the volatile token/timestamp params stripped, so the same piece is
+//     reused across token refreshes and repeat/backward seeks are edge hits.
+//   * the embed -> master lookup is memoised in memory for a couple of minutes so
+//     repeated playlist requests are instant and return an identical playlist.
+//   * playlists themselves are never cached: they carry per-request tokens.
 
 import {
   checkProxyUrl,
@@ -22,9 +30,20 @@ const CORS = {
   "Access-Control-Allow-Headers": "*",
 };
 
+/** Edge cache lifetime for media pieces. Tokens live ~8h; an hour is conservative. */
+const MEDIA_CACHE_TTL = 60 * 60;
+/** Refuse to cache single pieces larger than this (bytes). */
+const MAX_CACHE_BYTES = 32 * 1024 * 1024;
+/** How long a resolved embed -> master URL is reused. */
+const RESOLVE_TTL_MS = 120_000;
+
 // Per-isolate memory of hosts that real playlists/embeds pointed at.
 const learnedHosts = new Set();
 const MAX_LEARNED = 100;
+
+// Per-isolate memo of embed -> fresh master URL.
+const resolveCache = new Map();
+const MAX_RESOLVES = 200;
 
 function learnHost(rawHost) {
   const h = normalizeHost(rawHost);
@@ -129,8 +148,40 @@ async function resolveFromEmbed(embedUrl) {
   };
 }
 
+function getResolve(embedUrl) {
+  const hit = resolveCache.get(embedUrl);
+  if (!hit) return null;
+  if (hit.expires < Date.now()) {
+    resolveCache.delete(embedUrl);
+    return null;
+  }
+  return hit.url;
+}
+
+function setResolve(embedUrl, url) {
+  if (resolveCache.size >= MAX_RESOLVES) {
+    resolveCache.delete(resolveCache.keys().next().value);
+  }
+  resolveCache.set(embedUrl, { url, expires: Date.now() + RESOLVE_TTL_MS });
+}
+
+/** Edge cache key: the media URL with volatile token/timestamp params removed. */
+function cacheKeyFor(target) {
+  try {
+    const u = new URL(target);
+    for (const p of ["t", "s", "e"]) u.searchParams.delete(p);
+    return new Request(u.toString(), { method: "GET" });
+  } catch {
+    return new Request(target, { method: "GET" });
+  }
+}
+
+function cacheStore() {
+  return typeof caches !== "undefined" && caches?.default ? caches.default : null;
+}
+
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     if (request.method === "OPTIONS") {
@@ -143,6 +194,8 @@ export default {
         role: "worker",
         knownHosts: learnedHosts.size,
         allowAny: env?.PROXY_ALLOW_ANY === "1",
+        edgeCache: Boolean(cacheStore()),
+        resolvedMemo: resolveCache.size,
       });
     }
 
@@ -168,19 +221,27 @@ export default {
         if (!isSafePublicHost(embedUrl)) {
           return json({ error: "Embed host not allowed" }, 403);
         }
-        try {
-          const r = await resolveFromEmbed(embedUrl);
-          debug = {
-            htmlLength: r.htmlLength,
-            packedSeen: r.packedSeen,
-            unpackedLength: r.unpackedLength,
-          };
-          if (r.masterUrl && isSafePublicHost(r.masterUrl)) {
-            masterUrl = r.masterUrl;
-            learnHost(masterUrl);
+
+        const memo = getResolve(embedUrl);
+        if (memo) {
+          masterUrl = memo;
+          debug = { resolvedFrom: "memo" };
+        } else {
+          try {
+            const r = await resolveFromEmbed(embedUrl);
+            debug = {
+              htmlLength: r.htmlLength,
+              packedSeen: r.packedSeen,
+              unpackedLength: r.unpackedLength,
+            };
+            if (r.masterUrl && isSafePublicHost(r.masterUrl)) {
+              masterUrl = r.masterUrl;
+              learnHost(masterUrl);
+              setResolve(embedUrl, masterUrl);
+            }
+          } catch (err) {
+            debug = { resolveError: err.message };
           }
-        } catch (err) {
-          debug = { resolveError: err.message };
         }
       }
 
@@ -230,12 +291,25 @@ export default {
     }
     const target = check.url.toString();
 
+    const isM3u8Target = /\.m3u8(\?|$)/i.test(target);
+    const rangeHeader = request.headers.get("Range");
+    const cache = cacheStore();
+    // Whole-file GETs only: a 206 would poison the entry with a slice.
+    const cacheable = Boolean(cache) && !isM3u8Target && !rangeHeader && request.method === "GET";
+    const cacheKeyReq = cacheable ? cacheKeyFor(target) : null;
+
+    if (cacheable) {
+      try {
+        const hit = await cache.match(cacheKeyReq);
+        if (hit) return hit;
+      } catch {}
+    }
+
     const upstreamHeaders = new Headers();
     upstreamHeaders.set("User-Agent", UA);
     upstreamHeaders.set("Referer", referer);
     upstreamHeaders.set("Accept", "*/*");
-    const range = request.headers.get("Range");
-    if (range) upstreamHeaders.set("Range", range);
+    if (rangeHeader) upstreamHeaders.set("Range", rangeHeader);
 
     try {
       const response = await fetch(target, {
@@ -248,8 +322,7 @@ export default {
       for (const [k, v] of Object.entries(CORS)) responseHeaders.set(k, v);
 
       const isM3u8 =
-        target.includes(".m3u8") ||
-        (response.headers.get("content-type") || "").includes("mpegurl");
+        isM3u8Target || (response.headers.get("content-type") || "").includes("mpegurl");
 
       if (isM3u8) {
         if (!response.ok) {
@@ -267,6 +340,26 @@ export default {
 
       if (!response.ok && response.status !== 206) {
         return json({ error: "Upstream error", status: response.status }, 502);
+      }
+
+      // Whole media piece: answer at once and fill the edge cache behind the
+      // scenes, so the slow origin fetch only happens once per piece.
+      if (cacheable && response.ok && response.status === 200) {
+        const len = Number(response.headers.get("content-length") || 0);
+        if (len === 0 || len <= MAX_CACHE_BYTES) {
+          const cacheHeaders = new Headers(responseHeaders);
+          cacheHeaders.set("Cache-Control", `public, max-age=${MEDIA_CACHE_TTL}, immutable`);
+          cacheHeaders.delete("set-cookie");
+          cacheHeaders.delete("vary");
+
+          const body = response.clone().body;
+          if (body) {
+            const forCache = new Response(body, { status: 200, headers: cacheHeaders });
+            const put = cache.put(cacheKeyReq, forCache).catch(() => {});
+            if (ctx?.waitUntil) ctx.waitUntil(put);
+          }
+          responseHeaders.set("Cache-Control", `public, max-age=${MEDIA_CACHE_TTL}, immutable`);
+        }
       }
 
       return new Response(response.body, {
