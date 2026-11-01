@@ -5,6 +5,7 @@
 // /proxy endpoint with the Referer the CDN expects.
 
 import http from "node:http";
+import { timingSafeEqual } from "node:crypto";
 import { URL, fileURLToPath } from "node:url";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -300,6 +301,15 @@ function sendJson(req, res, status, data, extraHeaders = {}) {
 
 function stripTags(s) {
   return (s || "").replace(/<[^>]*>/g, "").trim();
+}
+
+/** Constant-time comparison for the /debug token. */
+function tokenMatches(given, expected) {
+  if (typeof given !== "string" || given.length === 0) return false;
+  const a = Buffer.from(given);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
 }
 
 function norm(t) {
@@ -877,7 +887,10 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (p === "/debug") {
-    if (DEBUG_TOKEN && u.searchParams.get("token") !== DEBUG_TOKEN) {
+    // Fail closed: the endpoint stays dark until DEBUG_TOKEN is configured.
+    if (!DEBUG_TOKEN) return sendJson(req, res, 404, { error: "Not found" });
+    if (!tokenMatches(u.searchParams.get("token"), DEBUG_TOKEN)) {
+      log("DEBUG", "rejected request with missing/incorrect token");
       return sendJson(req, res, 401, { error: "Unauthorized" });
     }
     try {

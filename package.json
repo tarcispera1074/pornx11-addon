@@ -1,6 +1,6 @@
 {
   "name": "pornx11-addon",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Stremio/Nuvio addon for pornx11.com",
   "type": "module",
   "main": "server.js",

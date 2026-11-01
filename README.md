@@ -50,7 +50,7 @@ You'll see:
 | `/meta/movie/pornx11:<url>.json` | Metadata |
 | `/stream/movie/pornx11:<url>.json` | Stream list |
 | `/proxy?url=…&referer=…` | Header-injecting proxy with m3u8 rewriting |
-| `/debug` | Upstream API probe (token-gated if `DEBUG_TOKEN` is set) |
+| `/debug` | Upstream API probe — returns 404 unless `DEBUG_TOKEN` is configured |
 
 ## Configuration
 
@@ -61,7 +61,7 @@ You'll see:
 | `ALLOWED_EXTRA_HOSTS` | – | Comma-separated extra media hosts the proxy may fetch |
 | `PROXY_ALLOW_ANY` | `0` | `1` removes the host allowlist (**trusted/private use only**) |
 | `DISABLE_JINA_FALLBACK` | `0` | `1` never sends URLs to `r.jina.ai` |
-| `DEBUG_TOKEN` | – | When set, `/debug` requires `?token=…` |
+| `DEBUG_TOKEN` | – | Enables `/debug`, which then requires `?token=…`. Unset means the endpoint is disabled |
 | `CATALOG_TTL_MINUTES` | `5` | Catalog cache lifetime |
 | `SITE_TIMEOUT_MS` | `15000` | Upstream request timeout |
 
